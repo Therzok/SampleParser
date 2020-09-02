@@ -3,11 +3,9 @@ using System.Collections.Generic;
 
 namespace SampleParser.Internal
 {
-    class CallGraphProcessor : Processor
+    sealed class CallGraphProcessor : Processor
     {
-        readonly List<SampleFrame> frames = new List<SampleFrame>();
-
-        public Frame[] Result => frames.ToArray();
+        public CallGraph CallGraph { get; } = new CallGraph();
 
         ParsingFrame? lastFrame;
 
@@ -18,18 +16,19 @@ namespace SampleParser.Internal
             // Starting a new thread
             if (frame.LastSymbolIndex == -1)
             {
-                frames.Add(frame.Frame);
+                CallGraph.Add(new Thread(frame.Frame));
             }
             else
             {
                 var parent = lastFrame!.GetParentFor(frame);
 
-                parent.Frame.AddChild(frame.Frame);
+                parent.Frame.AddChild(frame.Frame, true);
                 frame.Parent = parent;
             }
 
             lastFrame = frame;
         }
+
         class ParsingFrame
         {
             static readonly char[] knownSymbols = { '+', '!', ':', '|' };
@@ -47,7 +46,7 @@ namespace SampleParser.Internal
                 LastSymbolIndex = prefix.LastIndexOfAny(knownSymbols);
                 NumberIndex = prefix.Length;
 
-                Frame = new SampleFrame(frameContent);
+                Frame = ParseSampleFrame(frameContent);
             }
 
             public ParsingFrame GetParentFor(ParsingFrame frame)
@@ -75,6 +74,45 @@ namespace SampleParser.Internal
 
                 prefix = line.Slice(0, i);
                 frameContent = line.Slice(i);
+            }
+
+            SampleFrame ParseSampleFrame(ReadOnlySpan<char> line)
+            {
+                var sampleCount = int.Parse(GetToken(ref line, wsCount: 1).ToString());
+                var methodName = GetToken(ref line).ToString();
+                var tail = line.ToString();
+
+                return new SampleFrame(sampleCount, sampleCount, methodName, tail);
+            }
+
+            ReadOnlySpan<char> GetToken(ref ReadOnlySpan<char> line, int wsCount = 2)
+            {
+                int i;
+                line = line.TrimStart();
+
+                for (i = 0; i < line.Length; ++i)
+                {
+                    if (CheckWhitespace(line, i, wsCount))
+                        break;
+                }
+
+                var res = line.Slice(0, i);
+                var temp = line.Slice(i);
+                line = temp;
+                return res;
+
+                static bool CheckWhitespace(ReadOnlySpan<char> line, int i, int count)
+                {
+                    for (int j = 0; j < count; ++j)
+                    {
+                        if (!char.IsWhiteSpace(line[i + j]))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
             }
         }
     }

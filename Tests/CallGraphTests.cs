@@ -8,34 +8,12 @@ using SampleParser;
 using Tests;
 using Xunit;
 
+using static Tests.Helpers;
+
 namespace Tests
 {
-    public class SampleTests
+    public class CallGraphTests
     {
-        [Fact]
-        public void Test1()
-        {
-            var sample = SampleFile.Parse("/Users/Therzok/Desktop/sample_startup.txt");
-        }
-
-        Frame[] Process(string text)
-        {
-            var processor = new CallGraphProcessor();
-
-            using var reader = new StringReader(text);
-            string? line;
-
-            while ((line = reader.ReadLine()) != null)
-            {
-                if (line.Length == 0)
-                    continue;
-
-                processor.ProcessLine(line);
-            }
-
-            return processor.Result;
-        }
-
         const string jsCore = @"
     7940 Thread_2238240: JavaScriptCore bmalloc scavenger
     + 7940 thread_start  (in libsystem_pthread.dylib) + 15  [0x7fff68aa583b]
@@ -72,20 +50,20 @@ namespace Tests
         [Fact]
         public void JavaScriptCore()
         {
-            var frames = Process(jsCore);
+            var callGraph = ProcessCallGraph(jsCore);
 
-            Assert.Single(frames);
-            Assert.Equal(expectedJsCore, frames[0].ToPrefixNotation());
+            Assert.Single(callGraph);
+            Assert.Equal(expectedJsCore, callGraph[0].ToPrefixNotation());
         }
 
         [Fact]
         public void JavaScriptCoreTwice()
         {
-            var frames = Process(jsCore + Environment.NewLine + jsCore);
+            var callGraph = ProcessCallGraph(jsCore + Environment.NewLine + jsCore);
 
-            Assert.Equal(2, frames.Length);
-            Assert.Equal(expectedJsCore, frames[0].ToPrefixNotation());
-            Assert.Equal(expectedJsCore, frames[1].ToPrefixNotation());
+            Assert.Equal(2, callGraph.Count);
+            Assert.Equal(expectedJsCore, callGraph[0].ToPrefixNotation());
+            Assert.Equal(expectedJsCore, callGraph[1].ToPrefixNotation());
         }
 
         const string threeChildren = @"
@@ -112,10 +90,10 @@ namespace Tests
         [Fact]
         public void ThreeChildren()
         {
-            var frames = Process(threeChildren);
+            var callGraph = ProcessCallGraph(threeChildren);
 
-            Assert.Single(frames);
-            Assert.Equal(expectedThreeChildren, frames[0].ToPrefixNotation());
+            Assert.Single(callGraph);
+            Assert.Equal(expectedThreeChildren, callGraph[0].ToPrefixNotation());
         }
     }
 }
